@@ -30,13 +30,6 @@ export default async function handler(req, res) {
   const affiliateUrl = link.destination_url;
   const cleanUrl = affiliateUrl.replace('https://', '');
 
-  await supabase.from('clicks').insert({
-    link_id: link.id,
-    device: deviceType,
-    user_agent: ua,
-    clicked_at: new Date().toISOString()
-  });
-
   await supabase
     .from('links')
     .update({ click_count: (link.click_count || 0) + 1 })
@@ -78,7 +71,7 @@ export default async function handler(req, res) {
     fetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ link_id: linkId, outcome: outcome })
+      body: JSON.stringify({ link_id: linkId, outcome: outcome, device: isAndroid ? 'android' : isIOS ? 'ios' : 'desktop' })
     }).catch(function(){});
   }
 
