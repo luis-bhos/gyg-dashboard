@@ -6,14 +6,12 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  // Extract slug from URL path /r/abc123
   const slug = req.url.replace('/r/', '').split('?')[0];
 
   if (!slug) {
     return res.redirect(302, 'https://www.getyourguide.com/?partner_id=VCTDMLU&utm_medium=online_publisher');
   }
 
-  // Fetch link from DB
   const { data: link, error } = await supabase
     .from('links')
     .select('*')
@@ -24,17 +22,14 @@ export default async function handler(req, res) {
     return res.redirect(302, 'https://www.getyourguide.com/?partner_id=VCTDMLU&utm_medium=online_publisher');
   }
 
-  // Detect device
   const ua = req.headers['user-agent'] || '';
   const isAndroid = /Android/i.test(ua);
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
   const deviceType = isAndroid ? 'android' : isIOS ? 'ios' : 'desktop';
 
-  // Build destination URLs
   const affiliateUrl = link.destination_url;
   const cleanUrl = affiliateUrl.replace('https://', '');
 
-  // Record click
   await supabase.from('clicks').insert({
     link_id: link.id,
     device: deviceType,
@@ -42,13 +37,11 @@ export default async function handler(req, res) {
     clicked_at: new Date().toISOString()
   });
 
-  // Increment click count
   await supabase
     .from('links')
     .update({ click_count: (link.click_count || 0) + 1 })
     .eq('id', link.id);
 
-  // Serve HTML that handles the redirect with app detection
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -72,20 +65,19 @@ export default async function handler(req, res) {
   var affiliateUrl = "${affiliateUrl}";
   var isAndroid = ${isAndroid};
   var isIOS = ${isIOS};
+  var linkId = "${link.id}";
 
   function trackOutcome(outcome) {
     fetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ link_id: '${link.id}', outcome: outcome })
+      body: JSON.stringify({ link_id: linkId, outcome: outcome })
     }).catch(function(){});
   }
 
   if (isAndroid) {
-    var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end";
     var appOpened = false;
 
-    // If page becomes hidden, app opened successfully — cancel fallback
     document.addEventListener('visibilitychange', function() {
       if (document.hidden) {
         appOpened = true;
@@ -93,13 +85,9 @@ export default async function handler(req, res) {
       }
     });
 
-    window.addEventListener('pagehide', function() {
-      appOpened = true;
-    });
+    // Use getyourguide:// scheme - stays in app
+    window.location = "getyourguide://" + "${cleanUrl}";
 
-    window.location = intentUrl;
-
-    // Fallback to web only if app did NOT open after 2.5s
     setTimeout(function() {
       if (!appOpened) {
         trackOutcome('web');
@@ -117,7 +105,7 @@ export default async function handler(req, res) {
       }
     });
 
-    window.location = "getyourguide://${cleanUrl}";
+    window.location = "getyourguide://" + "${cleanUrl}";
 
     setTimeout(function() {
       if (!appOpenedIOS) {
