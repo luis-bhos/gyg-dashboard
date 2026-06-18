@@ -42,6 +42,8 @@ export default async function handler(req, res) {
     .update({ click_count: (link.click_count || 0) + 1 })
     .eq('id', link.id);
 
+  const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end`;
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -54,6 +56,7 @@ export default async function handler(req, res) {
     .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: #00E5A0; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     p { color: #888; font-size: 14px; }
+    #app-link { display: none; }
   </style>
 </head>
 <body>
@@ -61,6 +64,10 @@ export default async function handler(req, res) {
   <div class="spinner"></div>
   <p>Opening...</p>
 </div>
+
+<!-- Hidden anchor — clicked programmatically, behaves like a real tap -->
+<a id="app-link" href="${intentUrl}"></a>
+
 <script>
   var affiliateUrl = "${affiliateUrl}";
   var isAndroid = ${isAndroid};
@@ -85,9 +92,12 @@ export default async function handler(req, res) {
       }
     });
 
-    // Intent without fallback_url so Chrome doesn't auto-redirect
-    var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end";
-    window.location = intentUrl;
+    window.addEventListener('blur', function() {
+      appOpened = true;
+    });
+
+    // Click the hidden anchor — Chrome treats this like a real tap
+    document.getElementById('app-link').click();
 
     setTimeout(function() {
       if (!appOpened) {
