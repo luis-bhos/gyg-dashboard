@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 
-const PARTNER_ID = 'VCTDMLU'
 const BASE_URL = window.location.origin
 
 function generateSlug() {
@@ -53,16 +52,11 @@ export default function App() {
   async function createLink() {
     setError('')
     if (!form.name.trim()) return setError('Add a name for this link')
-    if (!form.destination_url.trim()) return setError('Add a GetYourGuide destination URL')
+    if (!form.destination_url.trim()) return setError('Add a destination URL')
 
     let dest = form.destination_url.trim()
-    if (!dest.startsWith('https://www.getyourguide.com')) {
-      return setError('URL must be from getyourguide.com')
-    }
-
-    // Add partner_id if not present
-    if (!dest.includes('partner_id')) {
-      dest += (dest.includes('?') ? '&' : '?') + `partner_id=${PARTNER_ID}&utm_medium=online_publisher`
+    if (!dest.startsWith('http')) {
+      dest = 'https://' + dest
     }
 
     setCreating(true)
@@ -101,7 +95,6 @@ export default function App() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  // Stats
   const totalClicks = clicks.length
   const appClicks = clicks.filter(c => c.outcome === 'app').length
   const webClicks = clicks.filter(c => c.outcome === 'web').length
@@ -110,7 +103,6 @@ export default function App() {
   const iosClicks = clicks.filter(c => c.device === 'ios').length
   const desktopClicks = clicks.filter(c => c.device === 'desktop').length
 
-  // Recent clicks with link name
   const recentClicks = clicks.slice(0, 20).map(c => {
     const link = links.find(l => l.id === c.link_id)
     return { ...c, linkName: link?.name || 'Unknown' }
@@ -118,11 +110,10 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="logo">
-          <span className="logo-icon">⚡</span>
-          <span className="logo-text">GYG Links</span>
+          <span className="logo-icon">✈</span>
+          <span className="logo-text">LinkPilot</span>
         </div>
         <nav className="nav">
           <button className={`nav-item ${activeTab === 'links' ? 'active' : ''}`} onClick={() => setActiveTab('links')}>
@@ -135,14 +126,12 @@ export default function App() {
         <div className="sidebar-footer">
           <div className="partner-badge">
             <span className="partner-dot"></span>
-            Partner ID: {PARTNER_ID}
+            LinkPilot v1.0
           </div>
         </div>
       </aside>
 
-      {/* Main */}
       <main className="main">
-        {/* Header */}
         <header className="header">
           <div>
             <h1 className="page-title">{activeTab === 'links' ? 'Links' : 'Analytics'}</h1>
@@ -155,7 +144,6 @@ export default function App() {
           )}
         </header>
 
-        {/* Create form */}
         {showForm && activeTab === 'links' && (
           <div className="form-card">
             <h3 className="form-title">Create New Link</h3>
@@ -164,30 +152,29 @@ export default function App() {
                 <label className="form-label">Link Name</label>
                 <input
                   className="form-input"
-                  placeholder="e.g. Barcelona Activities"
+                  placeholder="e.g. Booking Barcelona"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
                 />
               </div>
               <div className="form-group form-group-wide">
-                <label className="form-label">GetYourGuide URL</label>
+                <label className="form-label">Destination URL</label>
                 <input
                   className="form-input"
-                  placeholder="https://www.getyourguide.com/barcelona-l45/"
+                  placeholder="https://www.booking.com/...?aid=YOUR_ID"
                   value={form.destination_url}
                   onChange={e => setForm({ ...form, destination_url: e.target.value })}
                 />
               </div>
             </div>
             {error && <div className="form-error">{error}</div>}
-            <div className="form-hint">Your partner_id will be added automatically.</div>
+            <div className="form-hint">Paste any affiliate URL — Booking, GetYourGuide, Uber, Expedia and more.</div>
             <button className="btn-primary" onClick={createLink} disabled={creating}>
               {creating ? 'Creating...' : 'Create Link'}
             </button>
           </div>
         )}
 
-        {/* Links Tab */}
         {activeTab === 'links' && (
           <div className="content">
             {loading ? (
@@ -220,7 +207,7 @@ export default function App() {
                       </button>
                     </span>
                     <span className="link-dest" title={link.destination_url}>
-                      {link.destination_url.replace('https://www.getyourguide.com', 'gyg.com').substring(0, 40)}...
+                      {link.destination_url.substring(0, 45)}...
                     </span>
                     <span className="link-clicks">{link.click_count || 0}</span>
                     <span className="link-date">
@@ -236,18 +223,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div className="content">
-            {/* Stat cards */}
             <div className="stats-grid">
               <StatCard label="Total Clicks" value={totalClicks} />
-              <StatCard label="App Opens" value={appClicks} sub={`${appRate}% of clicks`} accent="#00E5A0" />
+              <StatCard label="App Opens" value={appClicks} sub={`${appRate}% of clicks`} accent="#7C6FFF" />
               <StatCard label="Web Fallback" value={webClicks} sub={`${100 - appRate}% of clicks`} />
               <StatCard label="Active Links" value={links.length} />
             </div>
 
-            {/* Device breakdown */}
             <div className="section-title">Device Breakdown</div>
             <div className="stats-grid">
               <StatCard label="Android" value={androidClicks} sub={totalClicks > 0 ? `${Math.round(androidClicks/totalClicks*100)}%` : '—'} accent="#A4C639" />
@@ -255,14 +239,13 @@ export default function App() {
               <StatCard label="Desktop" value={desktopClicks} sub={totalClicks > 0 ? `${Math.round(desktopClicks/totalClicks*100)}%` : '—'} />
             </div>
 
-            {/* Per link */}
             <div className="section-title">Clicks per Link</div>
             <div className="links-table">
-              <div className="table-header">
+              <div className="table-header analytics-header">
                 <span>Link</span>
-                <span>Total Clicks</span>
-                <span>App Opens</span>
-                <span>Web Fallback</span>
+                <span>Total</span>
+                <span>App</span>
+                <span>Web</span>
                 <span>App Rate</span>
               </div>
               {links.map(link => {
@@ -271,10 +254,10 @@ export default function App() {
                 const lWeb = lClicks.filter(c => c.outcome === 'web').length
                 const lRate = lClicks.length > 0 ? Math.round(lApp / lClicks.length * 100) : 0
                 return (
-                  <div key={link.id} className="table-row">
+                  <div key={link.id} className="table-row analytics-row">
                     <span className="link-name">{link.name}</span>
                     <span className="link-clicks">{lClicks.length}</span>
-                    <span style={{ color: '#00E5A0' }}>{lApp}</span>
+                    <span style={{ color: '#7C6FFF' }}>{lApp}</span>
                     <span>{lWeb}</span>
                     <span>
                       <span className={`rate-badge ${lRate > 50 ? 'rate-good' : ''}`}>{lRate}%</span>
@@ -284,10 +267,9 @@ export default function App() {
               })}
             </div>
 
-            {/* Recent clicks */}
             <div className="section-title">Recent Clicks</div>
             <div className="links-table">
-              <div className="table-header">
+              <div className="table-header recent-header">
                 <span>Link</span>
                 <span>Device</span>
                 <span>Outcome</span>
@@ -296,7 +278,7 @@ export default function App() {
               {recentClicks.length === 0 ? (
                 <div className="empty-state" style={{ padding: '24px' }}>No clicks yet.</div>
               ) : recentClicks.map(click => (
-                <div key={click.id} className="table-row">
+                <div key={click.id} className="table-row recent-row">
                   <span className="link-name">{click.linkName}</span>
                   <span className="device-badge">{click.device}</span>
                   <span>
