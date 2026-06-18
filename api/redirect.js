@@ -83,20 +83,49 @@ export default async function handler(req, res) {
 
   if (isAndroid) {
     var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;S.browser_fallback_url=" + encodeURIComponent(affiliateUrl) + ";end";
+    var appOpened = false;
+
+    // If page becomes hidden, app opened successfully — cancel fallback
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        appOpened = true;
+        trackOutcome('app');
+      }
+    });
+
+    window.addEventListener('pagehide', function() {
+      appOpened = true;
+    });
+
     window.location = intentUrl;
-    // If intent fails after 2s, track as web
+
+    // Fallback to web only if app did NOT open after 2.5s
     setTimeout(function() {
-      trackOutcome('web');
-    }, 2000);
-    // Track as app immediately (intent launched)
-    trackOutcome('app');
+      if (!appOpened) {
+        trackOutcome('web');
+        window.location = affiliateUrl;
+      }
+    }, 2500);
+
   } else if (isIOS) {
+    var appOpenedIOS = false;
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        appOpenedIOS = true;
+        trackOutcome('app');
+      }
+    });
+
     window.location = "getyourguide://${cleanUrl}";
+
     setTimeout(function() {
-      trackOutcome('web');
-      window.location = affiliateUrl;
+      if (!appOpenedIOS) {
+        trackOutcome('web');
+        window.location = affiliateUrl;
+      }
     }, 1500);
-    trackOutcome('app');
+
   } else {
     trackOutcome('web');
     window.location = affiliateUrl;
