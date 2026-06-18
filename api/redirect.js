@@ -82,7 +82,7 @@ export default async function handler(req, res) {
   }
 
   if (isAndroid) {
-    var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;S.browser_fallback_url=" + encodeURIComponent(affiliateUrl) + ";end";
+    var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end";
     var appOpened = false;
 
     // If page becomes hidden, app opened successfully — cancel fallback
