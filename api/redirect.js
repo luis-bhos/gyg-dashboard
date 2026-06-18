@@ -5,11 +5,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// App package map by domain
+const APP_PACKAGES = {
+  'getyourguide.com': 'com.getyourguide.android',
+  'booking.com': 'com.booking',
+  'uber.com': 'com.ubercab',
+  'airbnb.com': 'com.airbnb.android',
+  'expedia.com': 'com.expedia.bookings',
+  'tripadvisor.com': 'com.tripadvisor.tripadvisor',
+  'klook.com': 'com.klook.client',
+  'viator.com': 'com.viator',
+  'amazon.com': 'com.amazon.mShop.android.shopping',
+};
+
+function getAppPackage(url) {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    for (const [domain, pkg] of Object.entries(APP_PACKAGES)) {
+      if (hostname.includes(domain)) return pkg;
+    }
+  } catch(e) {}
+  return null;
+}
+
 export default async function handler(req, res) {
   const slug = req.url.replace('/r/', '').split('?')[0];
+  const forceWeb = req.url.includes('web=1');
 
   if (!slug) {
-    return res.redirect(302, 'https://www.getyourguide.com/?partner_id=VCTDMLU&utm_medium=online_publisher');
+    return res.redirect(302, 'https://www.google.com');
   }
 
   const { data: link, error } = await supabase
@@ -19,7 +43,7 @@ export default async function handler(req, res) {
     .single();
 
   if (error || !link) {
-    return res.redirect(302, 'https://www.getyourguide.com/?partner_id=VCTDMLU&utm_medium=online_publisher');
+    return res.redirect(302, 'https://www.google.com');
   }
 
   const ua = req.headers['user-agent'] || '';
@@ -29,15 +53,17 @@ export default async function handler(req, res) {
 
   const affiliateUrl = link.destination_url;
   const cleanUrl = affiliateUrl.replace('https://', '');
+  const appPackage = getAppPackage(affiliateUrl);
 
   await supabase
     .from('links')
     .update({ click_count: (link.click_count || 0) + 1 })
     .eq('id', link.id);
 
-  // Fallback URL points back to our own redirect page with ?web=1 to skip intent
-  const fallbackUrl = `https://gyg-dashboard.vercel.app/r/${slug}?web=1`;
-  const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+  const fallbackUrl = `https://${req.headers.host}/r/${slug}?web=1`;
+  const intentUrl = appPackage
+    ? `intent://${cleanUrl}#Intent;scheme=https;package=${appPackage};S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`
+    : null;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -46,11 +72,11 @@ export default async function handler(req, res) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Redirecting...</title>
   <style>
-    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0a0a0a; color: #fff; }
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0a0a0f; color: #fff; }
     .loader { text-align: center; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: #00E5A0; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #222; border-top-color: #7C6FFF; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    p { color: #888; font-size: 14px; }
+    p { color: #666; font-size: 14px; }
     #app-link { display: none; }
   </style>
 </head>
@@ -59,13 +85,15 @@ export default async function handler(req, res) {
   <div class="spinner"></div>
   <p>Opening...</p>
 </div>
-<a id="app-link" href="${intentUrl}"></a>
+<a id="app-link" href="${intentUrl || affiliateUrl}"></a>
 <script>
   var affiliateUrl = "${affiliateUrl}";
   var isAndroid = ${isAndroid};
   var isIOS = ${isIOS};
+  var forceWeb = ${forceWeb};
+  var hasAppPackage = ${!!appPackage};
   var linkId = "${link.id}";
-  var forceWeb = new URLSearchParams(window.location.search).get('web') === '1';
+  var cleanUrl = "${cleanUrl}";
 
   function trackOutcome(outcome) {
     fetch('/api/track', {
@@ -75,12 +103,11 @@ export default async function handler(req, res) {
     }).catch(function(){});
   }
 
-  if (forceWeb || (!isAndroid && !isIOS)) {
-    // No app — go straight to web
+  if (forceWeb || !hasAppPackage || (!isAndroid && !isIOS)) {
     trackOutcome('web');
     window.location = affiliateUrl;
 
-  } else if (isAndroid) {
+  } else if (isAndroid && hasAppPackage) {
     var appOpened = false;
 
     document.addEventListener('visibilitychange', function() {
@@ -109,7 +136,7 @@ export default async function handler(req, res) {
       }
     });
 
-    window.location = "getyourguide://${cleanUrl}";
+    window.location = "https://" + cleanUrl;
 
     setTimeout(function() {
       if (!appOpenedIOS) {
