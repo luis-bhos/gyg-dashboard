@@ -85,8 +85,9 @@ export default async function handler(req, res) {
       }
     });
 
-    // Use getyourguide:// scheme - stays in app
-    window.location = "getyourguide://" + "${cleanUrl}";
+    // Intent without fallback_url so Chrome doesn't auto-redirect
+    var intentUrl = "intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end";
+    window.location = intentUrl;
 
     setTimeout(function() {
       if (!appOpened) {
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
       }
     });
 
-    window.location = "getyourguide://" + "${cleanUrl}";
+    window.location = "getyourguide://${cleanUrl}";
 
     setTimeout(function() {
       if (!appOpenedIOS) {
