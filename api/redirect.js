@@ -42,7 +42,9 @@ export default async function handler(req, res) {
     .update({ click_count: (link.click_count || 0) + 1 })
     .eq('id', link.id);
 
-  const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;end`;
+  // Fallback URL points back to our own redirect page with ?web=1 to skip intent
+  const fallbackUrl = `https://gyg-dashboard.vercel.app/r/${slug}?web=1`;
+  const intentUrl = `intent://${cleanUrl}#Intent;scheme=https;package=com.getyourguide.android;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -64,15 +66,13 @@ export default async function handler(req, res) {
   <div class="spinner"></div>
   <p>Opening...</p>
 </div>
-
-<!-- Hidden anchor — clicked programmatically, behaves like a real tap -->
 <a id="app-link" href="${intentUrl}"></a>
-
 <script>
   var affiliateUrl = "${affiliateUrl}";
   var isAndroid = ${isAndroid};
   var isIOS = ${isIOS};
   var linkId = "${link.id}";
+  var forceWeb = new URLSearchParams(window.location.search).get('web') === '1';
 
   function trackOutcome(outcome) {
     fetch('/api/track', {
@@ -82,7 +82,12 @@ export default async function handler(req, res) {
     }).catch(function(){});
   }
 
-  if (isAndroid) {
+  if (forceWeb || (!isAndroid && !isIOS)) {
+    // No app — go straight to web
+    trackOutcome('web');
+    window.location = affiliateUrl;
+
+  } else if (isAndroid) {
     var appOpened = false;
 
     document.addEventListener('visibilitychange', function() {
@@ -92,11 +97,6 @@ export default async function handler(req, res) {
       }
     });
 
-    window.addEventListener('blur', function() {
-      appOpened = true;
-    });
-
-    // Click the hidden anchor — Chrome treats this like a real tap
     document.getElementById('app-link').click();
 
     setTimeout(function() {
@@ -124,10 +124,6 @@ export default async function handler(req, res) {
         window.location = affiliateUrl;
       }
     }, 1500);
-
-  } else {
-    trackOutcome('web');
-    window.location = affiliateUrl;
   }
 </script>
 </body>
