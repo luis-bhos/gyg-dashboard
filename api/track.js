@@ -8,26 +8,16 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { link_id, outcome } = req.body;
+  const { link_id, outcome, device } = req.body;
 
   if (!link_id || !outcome) return res.status(400).json({ error: 'Missing params' });
 
-  // Update the most recent click for this link with the outcome
-  const { data: recentClick } = await supabase
-    .from('clicks')
-    .select('id')
-    .eq('link_id', link_id)
-    .is('outcome', null)
-    .order('clicked_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (recentClick) {
-    await supabase
-      .from('clicks')
-      .update({ outcome })
-      .eq('id', recentClick.id);
-  }
+  await supabase.from('clicks').insert({
+    link_id,
+    outcome,
+    device: device || 'unknown',
+    clicked_at: new Date().toISOString()
+  });
 
   res.status(200).json({ ok: true });
 }
